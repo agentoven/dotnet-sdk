@@ -1,0 +1,36 @@
+<Project>
+  <PropertyGroup>
+    <TargetFrameworks>net10.0;net9.0;net8.0</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <Deterministic>true</Deterministic>
+    <!-- CA1716: Step, Plan, … are domain terms that happen to be VB keywords. -->
+    <NoWarn>$(NoWarn);CA1716</NoWarn>
+
+    <VersionPrefix>0.8.8</VersionPrefix>
+    <Authors>Techdwarfs Digital Solutions LLP</Authors>
+    <Company>Techdwarfs Digital Solutions LLP</Company>
+    <Product>AgentOven</Product>
+    <Copyright>Copyright 2026 AgentOven Contributors</Copyright>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageProjectUrl>https://agentoven.dev</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/agentoven/dotnet-sdk</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>agentoven;agents;ai;llm;a2a;mcp</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(IsPackable)' != 'false'">
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsPackable)' != 'false'">
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="/" Visible="false" />
+  </ItemGroup>
+</Project>

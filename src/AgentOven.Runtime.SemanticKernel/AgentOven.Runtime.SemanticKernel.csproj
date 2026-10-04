@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Serve a Semantic Kernel Kernel or Agent as an AgentOven agent, with the agent's MCP tools as kernel functions.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AgentOven.Runtime.AI\AgentOven.Runtime.AI.csproj" />
+    <PackageReference Include="Microsoft.SemanticKernel" />
+    <PackageReference Include="Microsoft.SemanticKernel.Agents.Core" />
+  </ItemGroup>
+</Project>

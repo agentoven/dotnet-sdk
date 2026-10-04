@@ -1,0 +1,17 @@
+<Project>
+  <PropertyGroup>
+    <!-- Set before importing the root props, whose packaging settings key off IsPackable. -->
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+  <PropertyGroup>
+    <IsTestProject>true</IsTestProject>
+    <OutputType>Exe</OutputType>
+    <!-- Test code: no XML docs, relaxed naming and async rules. -->
+    <NoWarn>$(NoWarn);CA1707;CA1515;CA2007;CA1861;CA1307;CA1309;CA1310;CA2000;CA1849;CA1031;CA2234;CA1062;CA1812;CA1822;CA5394;CA1859</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

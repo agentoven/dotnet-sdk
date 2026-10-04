@@ -1,0 +1,21 @@
+<Solution>
+  <Folder Name="/samples/">
+    <Project Path="samples/AgentFrameworkAgent/AgentFrameworkAgent.csproj" />
+    <Project Path="samples/ChatAgent/ChatAgent.csproj" />
+    <Project Path="samples/EchoAgent/EchoAgent.csproj" />
+    <Project Path="samples/QuickStart/QuickStart.csproj" />
+    <Project Path="samples/SemanticKernelAgent/SemanticKernelAgent.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/AgentOven.Extensions.DependencyInjection/AgentOven.Extensions.DependencyInjection.csproj" />
+    <Project Path="src/AgentOven.Runtime.AgentFramework/AgentOven.Runtime.AgentFramework.csproj" />
+    <Project Path="src/AgentOven.Runtime.AI/AgentOven.Runtime.AI.csproj" />
+    <Project Path="src/AgentOven.Runtime.SemanticKernel/AgentOven.Runtime.SemanticKernel.csproj" />
+    <Project Path="src/AgentOven.Runtime/AgentOven.Runtime.csproj" />
+    <Project Path="src/AgentOven/AgentOven.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AgentOven.Runtime.Tests/AgentOven.Runtime.Tests.csproj" />
+    <Project Path="tests/AgentOven.Tests/AgentOven.Tests.csproj" />
+  </Folder>
+</Solution>

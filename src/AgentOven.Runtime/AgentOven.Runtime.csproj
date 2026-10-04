@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Run a .NET agent under AgentOven: reads the AGENT_* environment the control plane injects, serves /invoke, /invoke/stream, /health, the agent card and A2A, calls MCP tools, and signals AGENT_READY.</Description>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\AgentOven\AgentOven.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AgentOven.Runtime.Tests" />
+  </ItemGroup>
+</Project>

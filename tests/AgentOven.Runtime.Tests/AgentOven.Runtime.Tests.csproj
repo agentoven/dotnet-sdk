@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AgentOven.Runtime\AgentOven.Runtime.csproj" />
+    <ProjectReference Include="..\..\src\AgentOven.Runtime.AI\AgentOven.Runtime.AI.csproj" />
+    <ProjectReference Include="..\..\src\AgentOven.Runtime.AgentFramework\AgentOven.Runtime.AgentFramework.csproj" />
+    <ProjectReference Include="..\..\src\AgentOven.Runtime.SemanticKernel\AgentOven.Runtime.SemanticKernel.csproj" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" />
+    <Compile Include="..\AgentOven.Tests\StubHttpHandler.cs" Link="StubHttpHandler.cs" />
+  </ItemGroup>
+</Project>

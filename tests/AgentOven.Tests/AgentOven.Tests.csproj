@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AgentOven\AgentOven.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <ProjectReference Include="..\..\src\AgentOven.Extensions.DependencyInjection\AgentOven.Extensions.DependencyInjection.csproj" />
+  </ItemGroup>
+</Project>

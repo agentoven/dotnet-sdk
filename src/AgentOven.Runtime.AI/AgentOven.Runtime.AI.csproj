@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Microsoft.Extensions.AI integration for AgentOven agents: an IChatClient for the model the control plane resolved (OpenAI, Azure OpenAI, Anthropic, Ollama, Groq, …), the agent's MCP tools as AIFunctions, and a ready-made tool-calling agent handler.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AgentOven.Runtime\AgentOven.Runtime.csproj" />
+    <PackageReference Include="Microsoft.Extensions.AI" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
+    <PackageReference Include="OpenAI" />
+    <PackageReference Include="Anthropic" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AgentOven.Runtime.Tests" />
+    <InternalsVisibleTo Include="AgentOven.Runtime.AgentFramework" />
+    <InternalsVisibleTo Include="AgentOven.Runtime.SemanticKernel" />
+  </ItemGroup>
+</Project>

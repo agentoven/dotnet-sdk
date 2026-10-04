@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Serve a Microsoft Agent Framework AIAgent as an AgentOven agent, or build a ChatClientAgent from the configuration the control plane injects.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AgentOven.Runtime.AI\AgentOven.Runtime.AI.csproj" />
+    <PackageReference Include="Microsoft.Agents.AI" />
+  </ItemGroup>
+</Project>

@@ -1,7 +1,7 @@
 # 0001 — .NET SDK API surface (proposal)
 
-Status: **Draft, for review.** No code has been written yet. This document
-proposes the shape of the public API so we can agree on it before building.
+Status: **Accepted; implemented in v1.** Section 8 records the review decisions and
+what changed once the implementation was checked against the Go control plane.
 
 Reference implementations it is modelled on (in `agentoven/agentoven`):
 
@@ -22,7 +22,7 @@ The Python SDK has two halves. The .NET SDK mirrors both.
 
 **Kept as-is (vocabulary and semantics):**
 
-- The kitchen metaphor: `Bake`, `Cool`, `Rewarm`, `Recook`, `Retire`; kitchens; ingredients; recipes.
+- The kitchen metaphor: `Bake`, `Cool`, `Rewarm`, `Recook`; kitchens; ingredients; recipes.
 - `AgentStatus`: `Draft, Baking, Ready, Cooled, Burnt, Retired`.
 - `IngredientKind`: `Model, Tool, Prompt, Data, Observability, Embedding, VectorStore, Retriever, Scenario`.
 - Ingredient factories: `Ingredient.model(...)`, `Ingredient.tool(...)` → `Ingredient.Model(...)`, `Ingredient.Tool(...)`.
@@ -53,14 +53,14 @@ The Python SDK has two halves. The .NET SDK mirrors both.
 | `AgentOven` | `AgentOvenClient`, models, builders, exceptions | `System.Text.Json` (in-box on .NET 8+) |
 | `AgentOven.Extensions.DependencyInjection` | `services.AddAgentOven(...)`, `IHttpClientFactory`, `IOptions` binding | `Microsoft.Extensions.Http`, `.Options` |
 | `AgentOven.Runtime` | Port of `agentoven.runtime`: env config, `MapAgentOven(...)`, `AGENT_READY` | ASP.NET Core (`FrameworkReference`) |
-| `AgentOven.Runtime.AI` | Adapters: `Microsoft.Extensions.AI` `IChatClient`, MCP tools as `AIFunction`s, Microsoft Agent Framework / Semantic Kernel agent → handler | `Microsoft.Extensions.AI` |
+| `AgentOven.Runtime.AI` | `Microsoft.Extensions.AI`: `IChatClient` for the injected model, MCP tools as `AIFunction`s, `ChatClientAgentHandler` | `Microsoft.Extensions.AI`, `OpenAI`, `Anthropic` |
+| `AgentOven.Runtime.AgentFramework` | Serve a Microsoft Agent Framework `AIAgent` | `Microsoft.Agents.AI` |
+| `AgentOven.Runtime.SemanticKernel` | Serve a Semantic Kernel `Kernel` or `Agent` | `Microsoft.SemanticKernel` |
 
 Python's LangChain / LangGraph / CrewAI adapters map to the .NET ecosystem's
 equivalents: `Microsoft.Extensions.AI`, Microsoft Agent Framework and Semantic Kernel.
 
-Target frameworks: `net8.0;net10.0` (both LTS). `netstandard2.0` for .NET
-Framework is possible for the `AgentOven` package later if an enterprise user
-needs it — it costs us polyfills, so not in v1.
+Target frameworks: `net10.0;net9.0;net8.0` (the latest .NET plus the two before it).
 
 ---
 
@@ -155,7 +155,6 @@ IReadOnlyList<Agent> all = await oven.Agents.ListAsync();
 await oven.Agents.BakeAsync("summarizer", new BakeOptions { Environment = "prod" });
 await oven.Agents.CoolAsync("summarizer");
 await oven.Agents.RewarmAsync("summarizer");
-await oven.Agents.RetireAsync("summarizer");
 await oven.Agents.DeleteAsync("summarizer");
 
 InvokeResult r = await oven.Agents.InvokeAsync("summarizer", "Summarize this contract: ...");
@@ -199,8 +198,8 @@ Fluent, because a recipe is a DAG spec:
 var recipe = Recipe.Create("contract-review")
     .Step("extract",   s => s.Agent("extractor"))
     .Step("summarize", s => s.Agent("summarizer").DependsOn("extract").Timeout(TimeSpan.FromMinutes(2)))
-    .Step("risk",      s => s.Agent("risk-scorer").DependsOn("extract").Parallel())
-    .Step("approve",   s => s.HumanGate().DependsOn("summarize", "risk").Notify("legal@corp.com"))
+    .Step("risk",      s => s.Agent("risk-scorer").DependsOn("extract"))    // parallel with summarize
+    .Step("approve",   s => s.HumanGate(approvers: ["legal@corp.com"]).DependsOn("summarize", "risk"))
     .Build();
 
 await oven.Recipes.CreateAsync(recipe);
@@ -210,8 +209,8 @@ RecipeRun run = await oven.Recipes.BakeAsync("contract-review", input: new { con
 run = await oven.Recipes.WaitForCompletionAsync(run, pollInterval: TimeSpan.FromSeconds(2));
 ```
 
-`Timeout(TimeSpan)` is serialized to the server's string form (`"2m"`), so
-callers never build duration strings by hand.
+`Timeout(TimeSpan)` is serialized as the server's `timeout_secs`, so callers never
+convert units by hand.
 
 ### 3.6 Pro APIs
 
@@ -381,10 +380,71 @@ and every type name above stays the same — only the `using` line changes.
 
 ---
 
-## 7. Open questions for review
+## 7. Open questions for review (answered; see section 8)
 
 1. **Namespace** — `AgentOven` (recommended) or `Techdwarfs.AgentOven`?
 2. **Fluency level** — are builders + resource clients + handles the right mix, or do you want the flat Python-style surface (`oven.BakeAsync("x")` on the root client) as well? (We can add flat shortcuts for the top 6 agent operations without much cost.)
 3. **.NET Framework** — is `netstandard2.0` needed in v1?
 4. **Runtime adapters** — which frameworks first: `Microsoft.Extensions.AI` only, or also Microsoft Agent Framework / Semantic Kernel?
 5. **Scope of v1** — proposal: core agent/recipe/provider/session/kitchen operations + runtime in v1; the rest of the Pro surface in v1.1.
+
+---
+
+## 8. Decisions and changes in v1
+
+**Review decisions**
+
+| Question | Decision |
+|---|---|
+| Namespace | `AgentOven`, with Techdwarfs in the package metadata |
+| Fluency | Builders + resource clients + handles, as proposed; no flat shortcuts |
+| Targets | Latest .NET plus the two before it: `net10.0;net9.0;net8.0`. No `netstandard2.0` |
+| Adapters | All three, as separate packages so users pull only what they use: `AgentOven.Runtime.AI` (Microsoft.Extensions.AI), `AgentOven.Runtime.AgentFramework`, `AgentOven.Runtime.SemanticKernel` |
+| v1 scope | Agents, recipes, providers, sessions, kitchens, runtime. Other Pro APIs in v1.1 |
+
+**Changes made to match the server** (`control-plane/` in agentoven/agentoven is the source of truth, not the
+Python or Rust clients):
+
+- *No `RetireAsync`.* The server has no retire route; use `DeleteAsync`.
+- *No `.Parallel()` on steps.* Steps whose `depends_on` are satisfied already run in parallel. `.Notify(...)`
+  takes notification tool names (`notify_tools`), and approvers go on `.HumanGate(approvers:, roles:, domain:)`.
+  Step kinds are snake_case (`human_gate`, `fan_out`), and timeouts are sent as `timeout_secs`.
+- *System prompt.* The server has no `system_prompt` field, and the Python SDK's value is silently dropped.
+  `WithSystemPrompt` adds an inline prompt ingredient instead.
+- *Guardrails.* They are always sent with `enabled: true`, because the server treats a missing value as disabled.
+- *Sessions.* They live under `/agents/{name}/sessions`. The message body field is `content`.
+- *Recipe runs.* `GET .../runs/{id}` returns `{run, pending_gates}`. The client unwraps it into `RecipeRun.PendingGates`.
+- *Enums.* Server-owned value sets are extensible string structs (`AgentStatus`, `StepKind`, …). An unknown value
+  round-trips instead of failing, and `==` compares case-insensitively.
+- *Errors.* `AgentOvenApiException` exposes both `error` (a message, or a code such as `authentication_failed`)
+  and `message`. There is no 402: the OSS server does not use it.
+
+**Runtime contract.** The runtime follows the control plane's process manager and its embedded runner
+(`internal/process/manager.go`, `templates/agent_runner.py`), not the Python SDK's `runtime` module:
+
+- It reads `AGENT_PORT` first, then `AGENTOVEN_PORT`. Child processes inherit the control plane's own `AGENTOVEN_PORT`.
+- It reads `AGENT_API_KEY`, `AGENT_API_ENDPOINT` and `CONTROL_PLANE_TOKEN`.
+- It serves `/health`, which the Docker, Kubernetes and local executors probe and the Python SDK does not serve.
+- It serves `/invoke/stream` and A2A.
+- `AGENT_MODEL_PROVIDER` carries the provider's *name*, not its kind. `AgentOvenRuntime.ModelKind` reads
+  `AGENT_MODEL_KIND` or infers the kind from the name.
+
+**Verified end to end.** The Go control plane (v0.5.1) was built from source. It baked .NET agents that run their
+own processes, from `samples/EchoAgent` and `samples/ChatAgent`. Verified: register, bake (process spawned,
+`AGENT_READY` seen), invoke through the control plane, two-step recipe runs, sessions, log streaming, and
+cool/rewarm. For ChatAgent, the system prompt was rendered with invoke variables, and token usage came back
+through the control plane.
+
+**Server issues found** (in agentoven/agentoven, not fixed here):
+
+1. `POST /agents/{name}/invoke/stream` returns 404 for every agent. `StreamInvokeAgent` calls
+   `Store.GetAgent(ctx, agentName, kitchen)`, but the signature is `(ctx, kitchen, name)`.
+   `InvokeStreamingAsync` follows the documented contract and will work once that is fixed.
+2. The process manager injects the provider name as `AGENT_MODEL_PROVIDER`, and no kind. The built-in runner
+   compares it against kinds, so a provider named anything other than its kind falls back to OpenAI.
+   Suggested fix: also inject `AGENT_MODEL_KIND`.
+3. A framework-native agent still needs a model ingredient to bake, and the provider must answer a health check.
+4. The built-in runner's delegation sends `X-Kitchen-Id`, which the server never reads (it reads `X-Kitchen`).
+   Delegated calls therefore land in the `default` kitchen.
+5. The Python SDK's runtime reads `AGENTOVEN_PORT` (default 8000) and `AGENT_SYSTEM_PROMPT`. Neither is what the
+   local executor sets. It also does not serve `/health`.

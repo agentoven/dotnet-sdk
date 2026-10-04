@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AgentOven.Runtime.AI\AgentOven.Runtime.AI.csproj" />
+  </ItemGroup>
+</Project>

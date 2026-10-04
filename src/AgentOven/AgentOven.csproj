@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>.NET client for the AgentOven control plane: register, bake and invoke agents, run recipes, manage providers, sessions and kitchens.</Description>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AgentOven.Tests" />
+    <InternalsVisibleTo Include="AgentOven.Runtime" />
+  </ItemGroup>
+</Project>
