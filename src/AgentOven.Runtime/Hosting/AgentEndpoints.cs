@@ -145,7 +145,7 @@ internal sealed partial class AgentEndpoints
                 }
 
                 await WriteEventAsync(response, evt, ct).ConfigureAwait(false);
-                sawDone = evt is DoneStreamEvent;
+                sawDone = evt.IsTerminal;
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)

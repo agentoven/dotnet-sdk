@@ -227,7 +227,7 @@ public sealed class AgentsClient
 
             var parsed = AgentStreamEvent.Parse(evt.Data);
             yield return parsed;
-            if (parsed is DoneStreamEvent)
+            if (parsed.IsTerminal)
             {
                 yield break;
             }

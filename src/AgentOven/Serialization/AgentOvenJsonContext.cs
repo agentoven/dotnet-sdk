@@ -27,6 +27,8 @@ namespace AgentOven;
 [JsonSerializable(typeof(LogEntry))]
 [JsonSerializable(typeof(IReadOnlyList<LogEntry>))]
 [JsonSerializable(typeof(TokenUsage))]
+[JsonSerializable(typeof(PendingApproval))]
+[JsonSerializable(typeof(ExecutionTrace))]
 [JsonSerializable(typeof(ResolvedIngredients))]
 [JsonSerializable(typeof(IReadOnlyList<ResolvedTool>))]
 [JsonSerializable(typeof(IReadOnlyList<ResolvedDataSource>))]

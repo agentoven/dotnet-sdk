@@ -357,3 +357,16 @@ public sealed record LogEntry
     /// <inheritdoc />
     public override string ToString() => Line;
 }
+
+/// <summary>Tool calls waiting for a human decision before the run can continue.</summary>
+public sealed record PendingApproval
+{
+    /// <summary>Turn that requested them.</summary>
+    public int Turn { get; init; }
+
+    /// <summary>Every tool call of that turn.</summary>
+    public IReadOnlyList<ToolCall> ToolCalls { get; init; } = [];
+
+    /// <summary>The names among them that need approval.</summary>
+    public IReadOnlyList<string> GatedNames { get; init; } = [];
+}

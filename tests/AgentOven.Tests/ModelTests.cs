@@ -144,6 +144,34 @@ public class ModelTests
     }
 
     [Fact]
+    public void Parses_the_in_process_executor_stream_format()
+    {
+        // The executor's Event struct has no JSON tags on Type/Turn/Content, so they arrive capitalized.
+        var token = AgentStreamEvent.Parse("""{"Type":"token","Turn":1,"Content":"Hel"}""");
+        var call = AgentStreamEvent.Parse("""{"Type":"tool_call_start","Turn":1,"Content":"","tool_call":{"id":"c1","name":"lookup","arguments":{"id":7}}}""");
+        var result = AgentStreamEvent.Parse("""{"Type":"tool_call_end","Turn":1,"Content":"","tool_result":{"tool_call_id":"c1","name":"lookup","content":"found","is_error":false}}""");
+        var paused = AgentStreamEvent.Parse("""{"Type":"paused","Turn":2,"Content":"","pending":{"turn":2,"tool_calls":[{"id":"c2","name":"refund","arguments":{"amount":50}}],"gated_names":["refund"]},"trace":{"trace_id":"t-9"}}""");
+        var done = AgentStreamEvent.Parse("""{"Type":"done","Turn":2,"Content":"Hello","trace":{"trace_id":"t-9","usage":{"input_tokens":3,"output_tokens":2,"total_tokens":5}}}""");
+        var error = AgentStreamEvent.Parse("""{"Type":"error","Turn":0,"Content":"","err":"boom"}""");
+
+        Assert.Equal("Hel", token.Text);
+        Assert.Equal(1, token.Turn);
+        var c = Assert.IsType<ToolCallStreamEvent>(call);
+        Assert.Equal(("lookup", "c1", 7), (c.Name, c.CallId, c.Arguments!["id"]!.GetValue<int>()));
+        var r = Assert.IsType<ToolResultStreamEvent>(result);
+        Assert.Equal(("lookup", "found", "c1"), (r.Name, r.Result, r.CallId));
+        var p = Assert.IsType<PausedStreamEvent>(paused);
+        Assert.True(p.IsTerminal);
+        Assert.Equal("t-9", p.TraceId);
+        Assert.Equal(["refund"], p.Pending!.GatedNames);
+        var d = Assert.IsType<DoneStreamEvent>(done);
+        Assert.Equal("Hello", d.Response);
+        Assert.Equal(5, d.Usage!.TotalTokens);
+        Assert.Equal("boom", Assert.IsType<ErrorStreamEvent>(error).Message);
+        Assert.Null(error.Turn);
+    }
+
+    [Fact]
     public void Options_fall_back_to_defaults()
     {
         var resolved = new AgentOvenClientOptions { Url = new Uri("http://x") }.Resolve();
