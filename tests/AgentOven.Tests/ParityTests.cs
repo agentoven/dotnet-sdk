@@ -232,6 +232,24 @@ public class ParityTests
     }
 
     [Fact]
+    public async Task Agent_environment_routes_send_the_kitchen_uuid()
+    {
+        var (client, stub) = Create();
+        stub.RespondJson("""[{"id":"other","name":"default"},{"id":"6f1c2a9e-0d4b-4c43-9a57-3f0e8b2d1c77","name":"payments"}]""");
+        stub.RespondJson("""{"agent_name":"a","env_slug":"dev","status":"ready"}""");
+        stub.RespondJson("""[]""");
+
+        await client.Environments.BakeAgentAsync("a", "dev", cancellationToken: Ct);
+        await client.Environments.ListAgentEnvironmentsAsync("a", Ct);
+
+        Assert.Equal("/api/v1/kitchens", stub.Requests[0].Uri.AbsolutePath);
+        Assert.Equal("6f1c2a9e-0d4b-4c43-9a57-3f0e8b2d1c77", stub.Requests[1].Headers["X-Kitchen"]);
+        Assert.Equal(HttpMethod.Put, stub.Requests[1].Method);
+        Assert.Equal("6f1c2a9e-0d4b-4c43-9a57-3f0e8b2d1c77", stub.Requests[2].Headers["X-Kitchen"]);   // resolved once
+        Assert.Equal(3, stub.Requests.Count);
+    }
+
+    [Fact]
     public void Test_suite_builder_validates_cases()
     {
         TestSuite suite = TestSuite.For("classifier").Case("refund", "Refund $50", expect: "refund").ScenarioCase("auto", "refund-flow", 0.9);

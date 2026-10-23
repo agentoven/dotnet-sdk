@@ -71,21 +71,25 @@ public sealed class PromptsClient
         _http.GetAsync(ApiPath.Of("prompts", name, "versions"), AgentOvenJsonContext.Default.IReadOnlyListPrompt, cancellationToken);
 
     /// <summary>Adds a prompt. Reference it from an agent with <see cref="Ingredient.PromptRef"/>.</summary>
-    public Task<Prompt> AddAsync(Prompt prompt, CancellationToken cancellationToken = default)
+    public async Task<Prompt> AddAsync(Prompt prompt, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(prompt);
-        return _http.PostAsync(ApiPath.Of("prompts"), prompt, AgentOvenJsonContext.Default.Prompt, AgentOvenJsonContext.Default.Prompt, cancellationToken);
+        var envelope = await _http.PostAsync(ApiPath.Of("prompts"), prompt, AgentOvenJsonContext.Default.Prompt,
+            InternalJsonContext.Default.PromptEnvelope, cancellationToken).ConfigureAwait(false);
+        return envelope.Prompt ?? throw new AgentOvenException($"The server returned no prompt for '{prompt.Name}'.");
     }
 
     /// <summary>Adds a prompt from its parts.</summary>
     public Task<Prompt> AddAsync(string name, string template, IEnumerable<string>? tags = null, CancellationToken cancellationToken = default) =>
         AddAsync(new Prompt(name, template) { Tags = tags?.ToList() }, cancellationToken);
 
-    /// <summary>Saves a new version of a prompt.</summary>
-    public Task<Prompt> UpdateAsync(Prompt prompt, CancellationToken cancellationToken = default)
+    /// <summary>Saves a new version of a prompt. A template that fails validation with an error is refused (400).</summary>
+    public async Task<Prompt> UpdateAsync(Prompt prompt, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(prompt);
-        return _http.PutAsync(ApiPath.Of("prompts", prompt.Name), prompt, AgentOvenJsonContext.Default.Prompt, AgentOvenJsonContext.Default.Prompt, cancellationToken);
+        var envelope = await _http.PutAsync(ApiPath.Of("prompts", prompt.Name), prompt, AgentOvenJsonContext.Default.Prompt,
+            InternalJsonContext.Default.PromptEnvelope, cancellationToken).ConfigureAwait(false);
+        return envelope.Prompt ?? throw new AgentOvenException($"The server returned no prompt for '{prompt.Name}'.");
     }
 
     /// <summary>Deletes a prompt and its versions.</summary>

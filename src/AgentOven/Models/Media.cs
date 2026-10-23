@@ -143,7 +143,8 @@ public static class MediaTypes
 /// <summary>
 /// A provider's modality switches, written to <c>config.modalities</c>. Build one with
 /// <c>ProviderModalities.Create().Image().Pdf().Audio(stt: "whisper-1", tts: "tts-1").Build()</c>.
-/// On update, modalities you do not mention keep their settings; <see cref="ProviderModalitiesBuilder.Clear"/> removes one.
+/// On update, modalities you do not mention keep their settings. Turn one off with <c>Pdf(false)</c>;
+/// <see cref="ProviderModalitiesBuilder.Clear"/> removes the setting, which reverts it to the provider driver's default.
 /// </summary>
 public static class ProviderModalities
 {
@@ -190,7 +191,10 @@ public sealed class ProviderModalitiesBuilder
         return this;
     }
 
-    /// <summary>Removes a modality's configuration on update (sends <c>null</c>).</summary>
+    /// <summary>
+    /// Removes a modality's setting on update (sends <c>null</c>), reverting it to the provider driver's default.
+    /// To turn a modality off, set it to <see langword="false"/> instead.
+    /// </summary>
     public ProviderModalitiesBuilder Clear(string modality)
     {
         _modalities[modality] = null;

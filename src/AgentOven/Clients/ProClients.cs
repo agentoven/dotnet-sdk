@@ -263,22 +263,51 @@ public sealed class EnvironmentsClient
             AgentOvenJsonContext.Default.JsonObject, AgentOvenJsonContext.Default.PromotionResult, cancellationToken);
 
     /// <summary>Lists an agent's per-environment bakes.</summary>
-    public Task<IReadOnlyList<AgentEnvironment>> ListAgentEnvironmentsAsync(string agentName, CancellationToken cancellationToken = default) =>
-        _http.GetAsync(ApiPath.Of("agents", agentName, "environments"), AgentOvenJsonContext.Default.IReadOnlyListAgentEnvironment, cancellationToken);
+    public async Task<IReadOnlyList<AgentEnvironment>> ListAgentEnvironmentsAsync(string agentName, CancellationToken cancellationToken = default) =>
+        await (await ByKitchenIdAsync(cancellationToken).ConfigureAwait(false))
+            .GetAsync(ApiPath.Of("agents", agentName, "environments"), AgentOvenJsonContext.Default.IReadOnlyListAgentEnvironment, cancellationToken)
+            .ConfigureAwait(false);
 
     /// <summary>Gets an agent's bake in one environment.</summary>
-    public Task<AgentEnvironment> GetAgentEnvironmentAsync(string agentName, string slug, CancellationToken cancellationToken = default) =>
-        _http.GetAsync(ApiPath.Of("agents", agentName, "environments", slug), AgentOvenJsonContext.Default.AgentEnvironment, cancellationToken);
+    public async Task<AgentEnvironment> GetAgentEnvironmentAsync(string agentName, string slug, CancellationToken cancellationToken = default) =>
+        await (await ByKitchenIdAsync(cancellationToken).ConfigureAwait(false))
+            .GetAsync(ApiPath.Of("agents", agentName, "environments", slug), AgentOvenJsonContext.Default.AgentEnvironment, cancellationToken)
+            .ConfigureAwait(false);
 
     /// <summary>Bakes an agent into an environment with per-environment overrides (create or update).</summary>
-    public Task<AgentEnvironment> BakeAgentAsync(
+    public async Task<AgentEnvironment> BakeAgentAsync(
         string agentName, string slug, AgentEnvironmentRequest? settings = null, CancellationToken cancellationToken = default) =>
-        _http.PutAsync(ApiPath.Of("agents", agentName, "environments", slug), settings ?? new AgentEnvironmentRequest(),
-            AgentOvenJsonContext.Default.AgentEnvironmentRequest, AgentOvenJsonContext.Default.AgentEnvironment, cancellationToken);
+        await (await ByKitchenIdAsync(cancellationToken).ConfigureAwait(false))
+            .PutAsync(ApiPath.Of("agents", agentName, "environments", slug), settings ?? new AgentEnvironmentRequest(),
+                AgentOvenJsonContext.Default.AgentEnvironmentRequest, AgentOvenJsonContext.Default.AgentEnvironment, cancellationToken)
+            .ConfigureAwait(false);
 
     /// <summary>Cools and removes an agent's bake in an environment.</summary>
-    public Task RemoveAgentAsync(string agentName, string slug, CancellationToken cancellationToken = default) =>
-        _http.DeleteAsync(ApiPath.Of("agents", agentName, "environments", slug), cancellationToken);
+    public async Task RemoveAgentAsync(string agentName, string slug, CancellationToken cancellationToken = default) =>
+        await (await ByKitchenIdAsync(cancellationToken).ConfigureAwait(false))
+            .DeleteAsync(ApiPath.Of("agents", agentName, "environments", slug), cancellationToken).ConfigureAwait(false);
+
+    // Pro stores agent environments by kitchen UUID but agents by kitchen name, and both routes read X-Kitchen.
+    // The agent-environment routes therefore need the kitchen's UUID: resolve it once and send that instead.
+    private async Task<AgentOvenHttp> ByKitchenIdAsync(CancellationToken cancellationToken)
+    {
+        if (Guid.TryParse(_http.Kitchen, out _))
+        {
+            return _http;
+        }
+
+        if (_byKitchenId is null)
+        {
+            var kitchens = await _http.GetAsync(ApiPath.Of("kitchens"), AgentOvenJsonContext.Default.IReadOnlyListKitchen, cancellationToken)
+                .ConfigureAwait(false);
+            var id = kitchens.FirstOrDefault(k => k.Name == _http.Kitchen && Guid.TryParse(k.Id, out _))?.Id;
+            _byKitchenId = id is null ? _http : _http.WithKitchen(id);
+        }
+
+        return _byKitchenId;
+    }
+
+    private AgentOvenHttp? _byKitchenId;
 
     /// <summary>Which version of each agent runs in each environment.</summary>
     public Task<TraceabilityMatrix> GetTraceabilityMatrixAsync(CancellationToken cancellationToken = default) =>

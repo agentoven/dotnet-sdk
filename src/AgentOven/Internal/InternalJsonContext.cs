@@ -23,6 +23,7 @@ namespace AgentOven.Internal;
 [JsonSerializable(typeof(UploadState))]
 [JsonSerializable(typeof(ModelCatalogEnvelope))]
 [JsonSerializable(typeof(PromptValidationEnvelope))]
+[JsonSerializable(typeof(PromptEnvelope))]
 [JsonSerializable(typeof(CountEnvelope))]
 [JsonSerializable(typeof(ScopedKeyCreateRequest))]
 [JsonSerializable(typeof(RealtimeTokenRequest))]

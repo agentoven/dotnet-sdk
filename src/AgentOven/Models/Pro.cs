@@ -985,7 +985,7 @@ public sealed record ScenarioMatch
     public IReadOnlyList<string>? MissingTools { get; init; }
 
     /// <summary>Why it matched.</summary>
-    public string? Why { get; init; }
+    public IReadOnlyList<string>? Why { get; init; }
 }
 
 /// <summary>A request to run scenarios against an agent.</summary>

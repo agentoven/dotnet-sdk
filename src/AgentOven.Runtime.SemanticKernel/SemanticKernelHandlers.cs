@@ -2,9 +2,9 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using AgentOven.Runtime.AI;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.SemanticKernel.ChatCompletion;
 using SKAgent = Microsoft.SemanticKernel.Agents.Agent;
 

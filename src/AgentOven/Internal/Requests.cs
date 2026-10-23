@@ -72,6 +72,13 @@ internal sealed record ModelCatalogEnvelope
     public IReadOnlyList<ModelCapability>? Models { get; init; }
 }
 
+internal sealed record PromptEnvelope
+{
+    public Prompt? Prompt { get; init; }
+
+    public PromptValidationReport? Validation { get; init; }
+}
+
 internal sealed record PromptValidationEnvelope
 {
     public PromptValidationReport? Report { get; init; }
