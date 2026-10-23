@@ -41,16 +41,28 @@ public sealed class ProvidersClient
         string? endpoint = null,
         IEnumerable<string>? models = null,
         bool isDefault = false,
+        JsonObject? modalities = null,
         CancellationToken cancellationToken = default)
     {
-        JsonObject? config = apiKey is null ? null : new JsonObject { ["api_key"] = apiKey };
+        JsonObject? config = apiKey is null && modalities is null ? null : [];
+        if (apiKey is not null)
+        {
+            config!["api_key"] = apiKey;
+        }
+
+        if (modalities is not null)
+        {
+            config!["modalities"] = modalities;
+        }
+
         return AddAsync(
             new ModelProvider(name, kind) { Endpoint = endpoint, Models = models?.ToList(), Config = config, IsDefault = isDefault },
             cancellationToken);
     }
 
     /// <summary>
-    /// Updates a provider. <see cref="ModelProvider.IsDefault"/> is always applied; config keys are merged.
+    /// Updates a provider. Config keys (and each modality in <c>config.modalities</c>) are merged;
+    /// <see cref="ModelProvider.IsDefault"/> changes only when set.
     /// Ready agents using the provider are marked burnt and must be re-baked.
     /// </summary>
     public Task<ProviderUpdateResult> UpdateAsync(ModelProvider provider, CancellationToken cancellationToken = default)
@@ -77,6 +89,14 @@ public sealed class ProvidersClient
         _http.PostAsync(
             ApiPath.Of("models", "providers", name, "discover"), AgentOvenJsonContext.Default.ProviderDiscoveryResult, cancellationToken);
 
+    /// <summary>Lists the model catalog: context windows, prices and capabilities per model.</summary>
+    public async Task<IReadOnlyList<ModelCapability>> ListModelCatalogAsync(CancellationToken cancellationToken = default)
+    {
+        var envelope = await _http.GetAsync(ApiPath.Of("models", "catalog"), InternalJsonContext.Default.ModelCatalogEnvelope, cancellationToken)
+            .ConfigureAwait(false);
+        return envelope.Models ?? [];
+    }
+
     /// <summary>Lists provider templates (kinds, default endpoints and models).</summary>
     public Task<IReadOnlyList<ProviderTemplate>> ListTemplatesAsync(CancellationToken cancellationToken = default) =>
         _http.GetAsync(ApiPath.Of("models", "providers", "templates"), AgentOvenJsonContext.Default.IReadOnlyListProviderTemplate, cancellationToken);
@@ -88,6 +108,8 @@ public sealed class KitchensClient
     private readonly AgentOvenHttp _http;
 
     internal KitchensClient(AgentOvenHttp http) => _http = http;
+
+    internal AgentOvenHttp Http => _http;
 
     /// <summary>Lists kitchens.</summary>
     public Task<IReadOnlyList<Kitchen>> ListAsync(CancellationToken cancellationToken = default) =>

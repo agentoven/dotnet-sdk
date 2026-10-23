@@ -21,16 +21,29 @@ internal sealed class AgentOvenHttp
         _http = http;
         var url = resolved.Url!.ToString();
         _baseUri = new Uri(url.EndsWith('/') ? url : url + "/", UriKind.Absolute);
-        ApiKey = resolved.ApiKey;
+        // Scoped keys authenticate through X-Agent-Key; as a Bearer token the server rejects them.
+        if (resolved.ApiKey is { } key && key.StartsWith(ScopedKeyPrefix, StringComparison.Ordinal) && resolved.AgentKey is null)
+        {
+            AgentKey = key;
+        }
+        else
+        {
+            ApiKey = resolved.ApiKey;
+            AgentKey = resolved.AgentKey;
+        }
+
         ServiceToken = resolved.ServiceToken;
         Kitchen = resolved.Kitchen!;
     }
+
+    public const string ScopedKeyPrefix = "ao_sk_";
 
     private AgentOvenHttp(AgentOvenHttp other, string kitchen)
     {
         _http = other._http;
         _baseUri = other._baseUri;
         ApiKey = other.ApiKey;
+        AgentKey = other.AgentKey;
         ServiceToken = other.ServiceToken;
         Kitchen = kitchen;
     }
@@ -42,6 +55,10 @@ internal sealed class AgentOvenHttp
     public string? ApiKey { get; }
 
     public string? ServiceToken { get; }
+
+    public string? AgentKey { get; }
+
+    public HttpClient HttpClient => _http;
 
     public AgentOvenHttp WithKitchen(string kitchen) => new(this, kitchen);
 
@@ -81,8 +98,14 @@ internal sealed class AgentOvenHttp
             bytes = "{}"u8.ToArray();
         }
 
-        return JsonSerializer.Deserialize(bytes, responseType)
-            ?? throw new AgentOvenException($"The server returned an empty JSON body for {method} /{path}.");
+        var result = JsonSerializer.Deserialize(bytes, responseType);
+        if (result is null && responseType.Kind == JsonTypeInfoKind.Enumerable)
+        {
+            // Several list endpoints answer JSON null instead of [] when there is nothing to list.
+            result = JsonSerializer.Deserialize("[]"u8, responseType);
+        }
+
+        return result ?? throw new AgentOvenException($"The server returned an empty JSON body for {method} /{path}.");
     }
 
     public async Task SendAsync(HttpMethod method, string path, HttpContent? content, CancellationToken ct)
@@ -90,6 +113,53 @@ internal sealed class AgentOvenHttp
         using var request = CreateRequest(method, path, content);
         using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
         await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends a request and returns the status and body for success or any of <paramref name="expected"/> statuses,
+    /// for endpoints that report outcomes (such as a review verdict) through non-2xx codes.
+    /// </summary>
+    public async Task<(System.Net.HttpStatusCode Status, byte[] Body)> SendExpectingAsync(
+        HttpMethod method, string path, HttpContent? content, IReadOnlyCollection<System.Net.HttpStatusCode> expected, CancellationToken ct)
+    {
+        using var request = CreateRequest(method, path, content);
+        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseContentRead, ct).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode && !expected.Contains(response.StatusCode))
+        {
+            await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
+        }
+
+        return (response.StatusCode, await response.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false));
+    }
+
+    public static HttpContent Bytes(ReadOnlyMemory<byte> bytes)
+    {
+        var content = new ReadOnlyMemoryContent(bytes);
+        content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        return content;
+    }
+
+    /// <summary>Builds an absolute URI for a relative API path.</summary>
+    public Uri Resolve(string path) => new(_baseUri, path);
+
+    /// <summary>Applies auth and kitchen headers to an arbitrary header collection (for example a WebSocket request).</summary>
+    public void ApplyAuthHeaders(Action<string, string> setHeader)
+    {
+        setHeader("X-Kitchen", Kitchen);
+        if (ApiKey is not null)
+        {
+            setHeader("Authorization", "Bearer " + ApiKey);
+        }
+
+        if (ServiceToken is not null)
+        {
+            setHeader("X-Service-Token", ServiceToken);
+        }
+
+        if (AgentKey is not null)
+        {
+            setHeader("X-Agent-Key", AgentKey);
+        }
     }
 
     // ── Streaming ────────────────────────────────────────────────────────
@@ -143,6 +213,11 @@ internal sealed class AgentOvenHttp
         if (ServiceToken is not null)
         {
             request.Headers.TryAddWithoutValidation("X-Service-Token", ServiceToken);
+        }
+
+        if (AgentKey is not null)
+        {
+            request.Headers.TryAddWithoutValidation("X-Agent-Key", AgentKey);
         }
 
         request.Headers.UserAgent.Add(UserAgent);

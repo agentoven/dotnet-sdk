@@ -18,6 +18,7 @@ namespace AgentOven.Runtime;
 /// <item><term><c>AGENT_TOOLS_JSON</c>, <c>AGENT_DATA_SOURCES_JSON</c></term><description>resolved MCP tools and data sources</description></item>
 /// <item><term><c>AGENT_MAX_TURNS</c>, <c>AGENT_SKILLS</c>, <c>AGENT_RUNTIME</c></term><description>loop limit, skills, runtime label</description></item>
 /// <item><term><c>AGENTOVEN_CONTROL_PLANE_URL</c>, <c>CONTROL_PLANE_TOKEN</c></term><description>for calling back (delegation)</description></item>
+/// <item><term><c>AGENT_A2A_TOKEN</c></term><description>proof that a call comes from the control plane</description></item>
 /// </list>
 /// </remarks>
 public sealed class AgentOvenRuntime
@@ -68,6 +69,7 @@ public sealed class AgentOvenRuntime
 
         ControlPlaneUrl = Uri.TryCreate(Get("AGENTOVEN_CONTROL_PLANE_URL"), UriKind.Absolute, out var cp) ? cp : null;
         ControlPlaneToken = Get("CONTROL_PLANE_TOKEN");
+        CallerToken = Get("AGENT_A2A_TOKEN");
         ControlPlaneApiKey = Get("AGENTOVEN_API_KEY");
         HasProToken = Get("AGENTOVEN_PRO_TOKEN") is not null;
     }
@@ -141,6 +143,12 @@ public sealed class AgentOvenRuntime
 
     /// <summary>Service token (<c>X-Service-Token</c>) for callbacks.</summary>
     public string? ControlPlaneToken { get; }
+
+    /// <summary>
+    /// Token the control plane sends as <c>X-AgentOven-A2A-Token</c> on every call to this process
+    /// (<c>AGENT_A2A_TOKEN</c>). When set, the runtime rejects calls that do not carry it.
+    /// </summary>
+    public string? CallerToken { get; }
 
     /// <summary>API key for callbacks, if one was provided instead of a service token.</summary>
     public string? ControlPlaneApiKey { get; }

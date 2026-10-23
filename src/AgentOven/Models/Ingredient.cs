@@ -92,6 +92,9 @@ public sealed record Ingredient
             Config = Build(("scenario", scenario), ("rollouts", rollouts), ("min_pass_rate", minPassRate)),
         };
 
+    /// <summary>A skill from the kitchen's skill registry. Only accepted skills resolve.</summary>
+    public static Ingredient Skill(string name, bool required = true) => new(name, IngredientKind.Skill) { Required = required };
+
     /// <summary>An observability integration.</summary>
     public static Ingredient Observability(string name, JsonObject? config = null) =>
         new(name, IngredientKind.Observability) { Config = config };

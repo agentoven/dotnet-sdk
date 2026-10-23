@@ -19,8 +19,17 @@ public sealed class AgentOvenClientOptions
     /// <summary>Control plane base URL. Default: <c>http://localhost:8080</c>.</summary>
     public Uri? Url { get; set; }
 
-    /// <summary>Bearer token: an API key or a service-account token.</summary>
+    /// <summary>
+    /// API key, sent as <c>Authorization: Bearer</c>. A scoped key (<c>ao_sk_…</c>) given here is sent as
+    /// <c>X-Agent-Key</c> instead, which is where the server reads scoped keys.
+    /// </summary>
     public string? ApiKey { get; set; }
+
+    /// <summary>
+    /// A scoped key (see <see cref="KeysClient"/>), sent as <c>X-Agent-Key</c>. It can invoke only the agents it was
+    /// issued for. Falls back to <c>AGENTOVEN_AGENT_KEY</c>.
+    /// </summary>
+    public string? AgentKey { get; set; }
 
     /// <summary>
     /// Service token sent as <c>X-Service-Token</c>. The control plane injects one into
@@ -54,6 +63,7 @@ public sealed class AgentOvenClientOptions
             Url = url ?? DefaultUrl,
             ApiKey = NullIfEmpty(ApiKey) ?? NullIfEmpty(Environment.GetEnvironmentVariable("AGENTOVEN_API_KEY")),
             ServiceToken = NullIfEmpty(ServiceToken),
+            AgentKey = NullIfEmpty(AgentKey) ?? NullIfEmpty(Environment.GetEnvironmentVariable("AGENTOVEN_AGENT_KEY")),
             Kitchen = NullIfEmpty(Kitchen) ?? NullIfEmpty(Environment.GetEnvironmentVariable("AGENTOVEN_KITCHEN")) ?? DefaultKitchen,
             Timeout = Timeout,
         };

@@ -37,9 +37,14 @@ public sealed record ModelProvider
     /// </summary>
     public JsonObject? Config { get; init; }
 
-    /// <summary>Whether this is the kitchen's default provider. Always sent: an update without it clears the flag.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
-    public bool IsDefault { get; init; }
+    /// <summary>Whether this is the kitchen's default provider. On update it changes only when set.</summary>
+    public bool? IsDefault { get; init; }
+
+    /// <summary>
+    /// Effective modalities (<c>text</c>, <c>image</c>, …), as the server reports them. To configure them, put
+    /// <see cref="ProviderModalities"/> in <c>config.modalities</c>.
+    /// </summary>
+    public IReadOnlyList<string>? Modalities { get; init; }
 
     /// <summary>Secret-store reference for the API key.</summary>
     public string? SecretRef { get; init; }

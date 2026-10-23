@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
 namespace AgentOven;
@@ -76,6 +77,24 @@ public sealed record Agent
 
     /// <summary>Reasoning strategy.</summary>
     public ReasoningStrategy? ReasoningStrategy { get; init; }
+
+    /// <summary>
+    /// JSON Schema the final answer must match (structured output). Set it when registering: the server does not
+    /// apply it on update.
+    /// </summary>
+    public JsonObject? OutputSchema { get; init; }
+
+    /// <summary>
+    /// Tools that need a human's approval before they run. A call to one pauses the run; resume it with
+    /// <see cref="AgentsClient.ResumeAsync"/>. Set it when registering: the server does not apply it on update.
+    /// </summary>
+    public IReadOnlyList<string>? ApprovalTools { get; init; }
+
+    /// <summary>
+    /// Agents this one may delegate to (an allowlist for <c>agentoven_delegate</c>). Set it when registering:
+    /// the server does not apply it on update.
+    /// </summary>
+    public IReadOnlyList<string>? Subagents { get; init; }
 
     /// <summary>Stable A2A URL on the control plane (server-assigned).</summary>
     [JsonPropertyName("a2a_endpoint")]

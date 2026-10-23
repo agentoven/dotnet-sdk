@@ -15,6 +15,12 @@ public sealed class AgentOvenRuntimeOptions
     /// <summary>Version on the agent card. Default: <c>1.0.0</c>.</summary>
     public string Version { get; set; } = "1.0.0";
 
+    /// <summary>
+    /// Reject <c>/invoke</c>, <c>/invoke/stream</c> and A2A calls that lack the control plane's
+    /// <c>X-AgentOven-A2A-Token</c> (when <c>AGENT_A2A_TOKEN</c> is set). Default: <see langword="true"/>.
+    /// </summary>
+    public bool RequireControlPlaneToken { get; set; } = true;
+
     /// <summary>Description on the agent card when the control plane did not inject one.</summary>
     public string? Description { get; set; }
 }

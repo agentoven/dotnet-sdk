@@ -1,3 +1,5 @@
+using System.Text.Json.Nodes;
+
 namespace AgentOven;
 
 /// <summary>
@@ -24,6 +26,8 @@ public sealed class AgentBuilder
     private readonly List<Guardrail> _guardrails = [];
     private readonly List<string> _skills = [];
     private readonly Dictionary<string, string> _tags = [];
+    private readonly List<string> _approvalTools = [];
+    private readonly List<string> _subagents = [];
 
     internal AgentBuilder(string name)
     {
@@ -81,6 +85,33 @@ public sealed class AgentBuilder
     /// <summary>Sets the context window budget and an optional cheaper model for summarising history.</summary>
     public AgentBuilder WithContextBudget(int tokens, string? summaryModel = null) =>
         With(_agent with { ContextBudget = tokens, SummaryModel = summaryModel ?? _agent.SummaryModel });
+
+    /// <summary>Requires the final answer to match a JSON Schema (structured output).</summary>
+    public AgentBuilder WithOutputSchema(JsonObject schema)
+    {
+        ArgumentNullException.ThrowIfNull(schema);
+        return With(_agent with { OutputSchema = schema });
+    }
+
+    /// <summary>
+    /// Pauses the run whenever the model calls one of these tools, until a human approves or denies the call
+    /// (see <see cref="AgentsClient.ResumeAsync"/>).
+    /// </summary>
+    public AgentBuilder RequireApprovalFor(params string[] tools)
+    {
+        _approvalTools.AddRange(tools);
+        return this;
+    }
+
+    /// <summary>Lets the agent delegate to these agents (and only these) through <c>agentoven_delegate</c>.</summary>
+    public AgentBuilder DelegatesTo(params string[] agents)
+    {
+        _subagents.AddRange(agents);
+        return this;
+    }
+
+    /// <summary>Adds a skill from the kitchen's skill registry.</summary>
+    public AgentBuilder AddSkill(string name, bool required = true) => AddIngredient(Ingredient.Skill(name, required));
 
     /// <summary>Adds an ingredient.</summary>
     public AgentBuilder AddIngredient(Ingredient ingredient)
@@ -165,6 +196,8 @@ public sealed class AgentBuilder
         Guardrails = _guardrails.Count > 0 ? [.. _agent.Guardrails ?? [], .. _guardrails] : _agent.Guardrails,
         Skills = _skills.Count > 0 ? [.. _agent.Skills ?? [], .. _skills] : _agent.Skills,
         Tags = _tags.Count > 0 ? MergeTags(_agent.Tags, _tags) : _agent.Tags,
+        ApprovalTools = _approvalTools.Count > 0 ? [.. (_agent.ApprovalTools ?? []).Concat(_approvalTools).Distinct(StringComparer.Ordinal)] : _agent.ApprovalTools,
+        Subagents = _subagents.Count > 0 ? [.. (_agent.Subagents ?? []).Concat(_subagents).Distinct(StringComparer.Ordinal)] : _agent.Subagents,
     };
 
     /// <summary>Builds the agent.</summary>

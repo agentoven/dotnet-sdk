@@ -18,6 +18,8 @@ public sealed class AgentsClient
         Sessions = new SessionsClient(http);
     }
 
+    internal AgentOvenHttp Http => _http;
+
     /// <summary>A handle bound to one agent. No network call.</summary>
     public AgentHandle this[string name] => new(this, name);
 
@@ -190,13 +192,26 @@ public sealed class AgentsClient
     /// Runs the agent's full loop on one message. The control plane requires an identity here
     /// (an API key, scoped key or service token).
     /// </summary>
+    /// <remarks>
+    /// A run that reaches a tool listed in <see cref="Agent.ApprovalTools"/> cannot complete here: the server answers
+    /// 502. Use <see cref="InvokeStreamingAsync"/>, which ends with a <see cref="PausedStreamEvent"/>, or find the run
+    /// with <see cref="ListUnfinishedRunsAsync"/>, then <see cref="ResumeAsync"/>.
+    /// </remarks>
     public Task<InvokeResult> InvokeAsync(string name, string message, InvokeOptions? options = null, CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrEmpty(message);
-        var request = new InvokeRequest(message)
+        if (string.IsNullOrEmpty(message) && options?.Audio is null)
+        {
+            throw new ArgumentException("A message (or InvokeOptions.Audio) is required.", nameof(message));
+        }
+
+        var request = new InvokeRequest(string.IsNullOrEmpty(message) ? null : message)
         {
             Variables = options?.Variables,
             ThinkingEnabled = options?.ThinkingEnabled == true ? true : null,
+            SessionId = options?.SessionId,
+            Audio = options?.Audio,
+            VoiceOutput = options?.VoiceOutput == true ? true : null,
+            Voice = options?.Voice,
         };
         return _http.PostAsync(
             ApiPath.Of("agents", name, "invoke"),
@@ -215,7 +230,17 @@ public sealed class AgentsClient
         string name, string message, InvokeOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrEmpty(message);
-        var request = new InvokeRequest(message) { Variables = options?.Variables };
+        if (options?.Audio is not null || options?.VoiceOutput == true)
+        {
+            throw new ArgumentException("Voice input and output are not supported when streaming; use InvokeAsync.", nameof(options));
+        }
+
+        var request = new InvokeRequest(message)
+        {
+            Variables = options?.Variables,
+            ThinkingEnabled = options?.ThinkingEnabled == true ? true : null,
+            SessionId = options?.SessionId,
+        };
         var content = AgentOvenHttp.Json(request, InternalJsonContext.Default.InvokeRequest);
         await foreach (var evt in _http.StreamAsync(HttpMethod.Post, ApiPath.Of("agents", name, "invoke", "stream"), content, cancellationToken)
                            .ConfigureAwait(false))
@@ -232,6 +257,35 @@ public sealed class AgentsClient
                 yield break;
             }
         }
+    }
+
+    /// <summary>
+    /// Continues a run that paused on an approval-gated tool call (approve or deny it), or that was interrupted
+    /// (pass <paramref name="approved"/> = <see langword="null"/>). The result is completed, or paused again on
+    /// another gated call.
+    /// </summary>
+    /// <param name="name">Agent name.</param>
+    /// <param name="traceId">The run (from <see cref="PausedStreamEvent.TraceId"/> or <see cref="ListUnfinishedRunsAsync"/>).</param>
+    /// <param name="approved">The decision for a paused run; <see langword="null"/> to resume an interrupted one.</param>
+    /// <param name="note">On denial, the reason the model is told.</param>
+    /// <param name="cancellationToken">Cancellation.</param>
+    public Task<ResumeResult> ResumeAsync(
+        string name, string traceId, bool? approved, string? note = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(traceId);
+        var content = approved is { } decision
+            ? AgentOvenHttp.Json(new ResumeRequest(decision) { Note = note }, InternalJsonContext.Default.ResumeRequest)
+            : null;
+        return _http.SendAsync(HttpMethod.Post, ApiPath.Of("agents", name, "runs", traceId, "resume"), content,
+            AgentOvenJsonContext.Default.ResumeResult, cancellationToken);
+    }
+
+    /// <summary>Lists runs that are still running or paused (from the control plane's journal).</summary>
+    public async Task<IReadOnlyList<UnfinishedRun>> ListUnfinishedRunsAsync(CancellationToken cancellationToken = default)
+    {
+        var envelope = await _http.GetAsync(ApiPath.Of("agents", "runs", "unfinished"), InternalJsonContext.Default.UnfinishedRunsEnvelope, cancellationToken)
+            .ConfigureAwait(false);
+        return envelope.Runs ?? [];
     }
 
     /// <summary>One-shot model call with the agent's configuration, without the agentic loop (unless <paramref name="tools"/> is set).</summary>

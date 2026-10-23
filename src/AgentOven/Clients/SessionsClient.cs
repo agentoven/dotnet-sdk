@@ -39,9 +39,29 @@ public sealed class SessionsClient
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrEmpty(content);
+        return SendAsync(agentName, sessionId, content, attachments: null, promptVariables, cancellationToken);
+    }
+
+    /// <summary>
+    /// Sends a message with files: images, PDFs, audio (transcribed and appended to the message) or video. The agent's
+    /// provider must offer the matching modality. <paramref name="content"/> may be empty when there are attachments.
+    /// </summary>
+    public Task<SessionReply> SendAsync(
+        string agentName,
+        string sessionId,
+        string content,
+        IReadOnlyList<Attachment>? attachments,
+        IReadOnlyDictionary<string, string>? promptVariables = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(content) && (attachments is null || attachments.Count == 0))
+        {
+            throw new ArgumentException("A message or at least one attachment is required.", nameof(content));
+        }
+
         return _http.PostAsync(
             ApiPath.Of("agents", agentName, "sessions", sessionId, "messages"),
-            new SessionMessageRequest(content) { PromptVars = promptVariables },
+            new SessionMessageRequest(content ?? "") { ContentParts = attachments is { Count: > 0 } ? attachments : null, PromptVars = promptVariables },
             InternalJsonContext.Default.SessionMessageRequest,
             AgentOvenJsonContext.Default.SessionReply,
             cancellationToken);
@@ -110,6 +130,13 @@ public sealed class ChatSession : IAsyncDisposable
     {
         ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
         return _sessions.SendAsync(AgentName, Id, content, promptVariables, cancellationToken);
+    }
+
+    /// <summary>Sends a message with attachments (images, PDFs, audio, video).</summary>
+    public Task<SessionReply> SendAsync(string content, IReadOnlyList<Attachment> attachments, CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+        return _sessions.SendAsync(AgentName, Id, content, attachments, promptVariables: null, cancellationToken);
     }
 
     /// <summary>Gets the session with its history.</summary>

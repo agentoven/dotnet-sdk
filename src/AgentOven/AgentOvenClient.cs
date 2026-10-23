@@ -14,7 +14,7 @@ namespace AgentOven;
 /// var result = await oven.Agents["summarizer"].InvokeAsync("Summarize: ...");
 /// </code>
 /// </example>
-public sealed class AgentOvenClient : IDisposable
+public sealed partial class AgentOvenClient : IDisposable
 {
     private readonly AgentOvenHttp _http;
     private readonly HttpClient? _ownedHttpClient;
@@ -53,6 +53,15 @@ public sealed class AgentOvenClient : IDisposable
         Recipes = new RecipesClient(http);
         Providers = new ProvidersClient(http);
         Kitchens = new KitchensClient(http);
+        Tools = new ToolsClient(http);
+        Prompts = new PromptsClient(http);
+        Skills = new SkillsClient(http);
+        Rag = new RagClient(http);
+        Traces = new TracesClient(http);
+        Audit = new AuditClient(http);
+        Keys = new KeysClient(http);
+        Approvals = new ApprovalsClient(http);
+        InitializePro(http);
     }
 
     /// <summary>Control plane base URL.</summary>
@@ -72,6 +81,42 @@ public sealed class AgentOvenClient : IDisposable
 
     /// <summary>Kitchens (workspaces).</summary>
     public KitchensClient Kitchens { get; }
+
+    /// <summary>The MCP tool catalog.</summary>
+    public ToolsClient Tools { get; }
+
+    /// <summary>The versioned prompt store.</summary>
+    public PromptsClient Prompts { get; }
+
+    /// <summary>The skill registry.</summary>
+    public SkillsClient Skills { get; }
+
+    /// <summary>The knowledge base.</summary>
+    public RagClient Rag { get; }
+
+    /// <summary>Recorded invocations and spans.</summary>
+    public TracesClient Traces { get; }
+
+    /// <summary>The audit log.</summary>
+    public AuditClient Audit { get; }
+
+    /// <summary>Scoped API keys.</summary>
+    public KeysClient Keys { get; }
+
+    /// <summary>Approvals for recipes' human gates.</summary>
+    public ApprovalsClient Approvals { get; }
+
+    /// <summary>Gets the kitchen's settings.</summary>
+    public Task<KitchenSettings> GetSettingsAsync(CancellationToken cancellationToken = default) =>
+        _http.GetAsync(ApiPath.Of("settings"), AgentOvenJsonContext.Default.KitchenSettings, cancellationToken);
+
+    /// <summary>Updates the kitchen's settings.</summary>
+    public Task<KitchenSettings> UpdateSettingsAsync(KitchenSettings settings, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        return _http.PutAsync(ApiPath.Of("settings"), settings, AgentOvenJsonContext.Default.KitchenSettings,
+            AgentOvenJsonContext.Default.KitchenSettings, cancellationToken);
+    }
 
     /// <summary>
     /// Returns a client bound to another kitchen. It shares this client's connection pool, so it is cheap;

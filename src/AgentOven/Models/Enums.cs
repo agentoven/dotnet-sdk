@@ -275,6 +275,9 @@ public readonly record struct IngredientKind(string Value) : IExtensibleEnum<Ing
     /// <summary><c>scenario</c></summary>
     public static IngredientKind Scenario { get; } = new("scenario");
 
+    /// <summary><c>skill</c></summary>
+    public static IngredientKind Skill { get; } = new("skill");
+
     /// <inheritdoc />
     public static IngredientKind Create(string value) => new(value);
 

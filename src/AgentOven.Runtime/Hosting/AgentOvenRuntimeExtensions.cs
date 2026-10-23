@@ -94,12 +94,16 @@ public static class AgentOvenRuntimeExtensions
         endpoints.MapGet("/.well-known/agent-card.json", AgentEndpoints.AgentCardAsync);
         endpoints.MapGet("/agent-card", AgentEndpoints.AgentCardAsync);
 
+        var runtime = endpoints.ServiceProvider.GetRequiredService<AgentOvenRuntime>();
+        var options = endpoints.ServiceProvider.GetRequiredService<AgentOvenRuntimeOptions>();
+        var guard = new CallerGuard(runtime.CallerToken, options.RequireControlPlaneToken);
+
         return new CompositeConventionBuilder(
         [
-            endpoints.MapPost("/invoke", agent.InvokeAsync),
-            endpoints.MapPost("/invoke/stream", agent.StreamAsync),
-            endpoints.MapPost("/a2a", a2a.HandleAsync),
-            endpoints.MapPost("/", a2a.HandleAsync),
+            endpoints.MapPost("/invoke", guard.Wrap(agent.InvokeAsync)),
+            endpoints.MapPost("/invoke/stream", guard.Wrap(agent.StreamAsync)),
+            endpoints.MapPost("/a2a", guard.Wrap(a2a.HandleAsync)),
+            endpoints.MapPost("/", guard.Wrap(a2a.HandleAsync)),
         ]);
     }
 

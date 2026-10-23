@@ -42,6 +42,15 @@ public sealed record AgentCard
     [JsonPropertyName("defaultOutputModes")]
     public IReadOnlyList<string>? DefaultOutputModes { get; init; }
 
+    /// <summary>Modalities the agent's provider supports (<c>text</c>, <c>image</c>, <c>pdf</c>, <c>audio</c>, …).</summary>
+    [JsonPropertyName("modalities")]
+    public IReadOnlyList<string>? Modalities { get; init; }
+
+    /// <summary>Whether the agent accepts a modality, per its card.</summary>
+    public bool Supports(string modality) =>
+        string.Equals(modality, "text", StringComparison.OrdinalIgnoreCase)
+        || (Modalities?.Contains(modality, StringComparer.OrdinalIgnoreCase) ?? false);
+
     /// <summary>Fields this SDK version does not model (for example <c>authentication</c>, <c>tools</c>).</summary>
     [JsonExtensionData]
     public IDictionary<string, JsonElement>? AdditionalProperties { get; set; }

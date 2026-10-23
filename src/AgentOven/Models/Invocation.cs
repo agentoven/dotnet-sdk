@@ -53,6 +53,21 @@ public sealed record InvokeOptions
 
     /// <summary>Ask the model for extended thinking (managed agents).</summary>
     public bool ThinkingEnabled { get; init; }
+
+    /// <summary>Continue a conversation: the control plane keeps the history under this id.</summary>
+    public string? SessionId { get; init; }
+
+    /// <summary>
+    /// Speech input. The agent's provider transcribes it (it must offer the audio modality) and the transcript is
+    /// appended to the message. Not supported by <see cref="AgentsClient.InvokeStreamingAsync"/>.
+    /// </summary>
+    public AudioClip? Audio { get; init; }
+
+    /// <summary>Also answer as speech (<see cref="InvokeResult.Audio"/>).</summary>
+    public bool VoiceOutput { get; init; }
+
+    /// <summary>Text-to-speech voice (default <c>alloy</c>).</summary>
+    public string? Voice { get; init; }
 }
 
 /// <summary>The result of invoking an agent.</summary>
@@ -78,6 +93,15 @@ public sealed record InvokeResult
 
     /// <summary>Turn-by-turn trace. Present for agents run by the built-in executor.</summary>
     public ExecutionTrace? ExecutionTrace { get; init; }
+
+    /// <summary>Session id, for continuing the conversation.</summary>
+    public string? SessionId { get; init; }
+
+    /// <summary>Transcript of <see cref="InvokeOptions.Audio"/>.</summary>
+    public string? Transcript { get; init; }
+
+    /// <summary>The answer as speech, when <see cref="InvokeOptions.VoiceOutput"/> was set.</summary>
+    public AudioClip? Audio { get; init; }
 
     /// <summary>Fields this SDK version does not model.</summary>
     [JsonExtensionData]

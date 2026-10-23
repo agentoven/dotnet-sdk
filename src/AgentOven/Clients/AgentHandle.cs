@@ -63,6 +63,14 @@ public sealed class AgentHandle
     public IAsyncEnumerable<AgentStreamEvent> InvokeStreamingAsync(string message, InvokeOptions? options = null, CancellationToken cancellationToken = default) =>
         _agents.InvokeStreamingAsync(Name, message, options, cancellationToken);
 
+    /// <inheritdoc cref="AgentsClient.ResumeAsync"/>
+    public Task<ResumeResult> ResumeAsync(string traceId, bool? approved, string? note = null, CancellationToken cancellationToken = default) =>
+        _agents.ResumeAsync(Name, traceId, approved, note, cancellationToken);
+
+    /// <summary>Whether the agent accepts a modality (<c>image</c>, <c>pdf</c>, <c>audio</c>, …), per its card.</summary>
+    public async Task<bool> SupportsAsync(string modality, CancellationToken cancellationToken = default) =>
+        (await _agents.GetCardAsync(Name, cancellationToken).ConfigureAwait(false)).Supports(modality);
+
     /// <inheritdoc cref="AgentsClient.TestAsync"/>
     public Task<AgentTestResult> TestAsync(string message, bool thinking = false, bool tools = false, CancellationToken cancellationToken = default) =>
         _agents.TestAsync(Name, message, thinking, tools, cancellationToken);

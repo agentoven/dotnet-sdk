@@ -210,6 +210,28 @@ public class EndpointTests
         Assert.Contains("Hello Ada from support", await response.Content.ReadAsStringAsync(ct));
     }
 
+    [Fact]
+    public async Task Calls_without_the_control_plane_token_are_rejected()
+    {
+        var env = Env.WithTools();
+        env["AGENT_A2A_TOKEN"] = "pod-secret";
+        await using var app = await TestApp.StartAsync(AgentHandler.From((m, _) => Task.FromResult(m)), env: env);
+        var client = app.GetTestClient();
+        var ct = TestContext.Current.CancellationToken;
+
+        var anonymous = await client.PostAsync("/invoke", Json("""{"message":"hi"}"""), ct);
+        var wrong = new HttpRequestMessage(HttpMethod.Post, "/a2a") { Content = Json("{}") };
+        wrong.Headers.Add("X-AgentOven-A2A-Token", "nope");
+        var right = new HttpRequestMessage(HttpMethod.Post, "/invoke") { Content = Json("""{"message":"hi"}""") };
+        right.Headers.Add("X-AgentOven-A2A-Token", "pod-secret");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, anonymous.StatusCode);
+        Assert.Contains("authentication_required", await anonymous.Content.ReadAsStringAsync(ct));
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.SendAsync(wrong, ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(right, ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health", ct)).StatusCode);
+    }
+
     internal static StringContent Json(string json) => new(json, Encoding.UTF8, "application/json");
 
     internal static List<AgentStreamEvent> ParseSse(string body) =>
