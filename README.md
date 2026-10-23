@@ -4,7 +4,9 @@
 of the [Python SDK](https://github.com/agentoven/agentoven/tree/main/sdk/python) and has two halves:
 
 - **Client**: drive the control plane from any .NET app. Register agents, bake them, invoke them, run recipes,
-  and manage providers, sessions and kitchens.
+  and manage providers, sessions, kitchens, tools, prompts, skills, RAG, traces, audit and scoped keys. On
+  AgentOven Pro it also covers users, workspace guardrails, environments and promotion, service accounts,
+  schedules, test suites, scenarios, judges, credentials and realtime voice.
 - **Runtime**: write the agent itself in .NET. The control plane starts your process at bake time, and the
   runtime serves the endpoints it expects. Adapters cover Microsoft.Extensions.AI, Microsoft Agent Framework
   and Semantic Kernel.
@@ -90,6 +92,59 @@ await foreach (var line in summarizer.StreamLogsAsync(ct))                    //
     Console.WriteLine(line);
 ```
 
+### Tools, prompts, skills and the rest of the catalog
+
+```csharp
+await oven.Tools.AddAsync(new McpTool("order-lookup", "http://orders/mcp") { AuthConfig = ToolAuth.Bearer("orders-token") });
+await oven.Prompts.AddAsync("support", "You help {{customer}} with orders.");      // versioned on every update
+var report = await oven.Prompts.ValidateAsync("support");
+
+var skill = await oven.Skills.UploadFileAsync("pdf-tools.zip");      // chunked; SKILL.md at the zip root
+if (skill.NeedsReview) await oven.Skills.ApproveAsync(skill.Skill!.Name, "reviewed");
+
+var answer = await oven.Rag.QueryAsync("What is our refund window?", topK: 4);
+var traces = await oven.Traces.ListAsync(new TraceQuery { Agent = "support", Limit = 20 });
+var denied = await oven.Audit.CountAsync(new AuditQuery { Action = "agent.invoke" });
+
+// A scoped key that may only invoke one agent, 100 times. Clients use it as AgentKey (sent as X-Agent-Key).
+var key = await oven.Keys.CreateAsync("partner", ["support"], maxCalls: 100, expiresIn: "7d");
+```
+
+### Media, voice and approvals
+
+```csharp
+await using var chat = await support.Sessions.StartAsync();
+await chat.SendAsync("What is on this invoice?", [await Attachment.FromFileAsync("invoice.png")]);
+
+var spoken = await support.InvokeAsync("", new InvokeOptions                         // speech in, speech out
+    { Audio = await AudioClip.FromFileAsync("question.wav"), VoiceOutput = true });
+
+// A run paused on a gated tool is resumed with a decision.
+await support.ResumeAsync(traceId, approved: true, note: "ok to refund");
+
+await using var live = await oven.Realtime.ConnectAsync("support", voice: "alloy");   // Pro: realtime voice over WebSocket
+await live.SendTextAsync("hello");
+await foreach (var evt in live.ReadEventsAsync(ct)) { /* transcript, audio, response.done, … */ }
+```
+
+### AgentOven Pro
+
+The Pro routes live on the same client. Calling one against an OSS server returns 404.
+
+```csharp
+var dev = await oven.Environments.CreateAsync(new DeploymentEnvironment("Dev", "dev") { Order = 1 });
+await oven.Environments.BakeAgentAsync("support", "dev", new AgentEnvironmentRequest { GuardrailPolicy = "strict" });
+await oven.Environments.PromoteAsync(new PromotionRequest("support", "dev", "prod") { DryRun = true });
+
+var ci = await oven.ServiceAccounts.CreateAsync("ci", "baker");          // ci.Token is shown once; use it as ServiceToken
+await oven.Schedules.CreateAsync("contract-review", "0 3 * * *");
+
+var suite = await oven.TestSuites.CreateAsync(TestSuite.For("support")
+    .Case("greets", "hello", expect: "hello")
+    .ScenarioCase("refunds", scenarioId, minPassRate: 0.9));
+var run = await oven.TestSuites.WaitForRunAsync(suite.Id, await oven.TestSuites.RunAsync(suite.Id));
+```
+
 ### Dependency injection
 
 ```csharp
@@ -168,6 +223,10 @@ The runtime implements the same process contract as the control plane's built-in
 | `POST /`, `POST /a2a` | A2A JSON-RPC `tasks/send`, `tasks/get`, `tasks/cancel` |
 | stdout `AGENT_READY` | printed once Kestrel is listening on `AGENT_PORT` |
 
+When the control plane injects `AGENT_A2A_TOKEN`, it sends the same value as `X-AgentOven-A2A-Token`, and the
+runtime rejects calls to `/invoke`, `/invoke/stream` and A2A that lack it (401). Without the variable, as in local
+development, every call is accepted. `AgentOvenRuntimeOptions.RequireControlPlaneToken = false` turns the check off.
+
 MCP tools are called the same way the built-in runner calls them: JSON-RPC `tools/call`, falling back to REST
 `/call`. Orchestrator agents, meaning those with no tools of their own, also get `agentoven_delegate`, which calls
 other agents in the kitchen with the injected service token.
@@ -178,6 +237,18 @@ other agents in the kitchen with the injected service token.
 dotnet build
 dotnet test                         # xunit v3 on Microsoft.Testing.Platform (see global.json)
 dotnet pack -c Release -o artifacts
+```
+
+### End-to-end tests
+
+`tests/AgentOven.IntegrationTests` drives real control planes. Without the environment below the tests skip, so
+`dotnet test` stays offline. `scripts/e2e.sh` sets it up: it builds the samples, starts a fake OpenAI-compatible
+model and MCP server (`tests/e2e/fake_upstream.py`), starts the OSS server, and runs the OSS suite.
+
+```bash
+scripts/e2e.sh                        # OSS: needs Go and ../agentoven, or AGENTOVEN_OSS_BIN=<server binary>
+scripts/e2e.sh --pro                  # then Pro: also DATABASE_URL (PostgreSQL + pgvector) and a license:
+                                      #   cd ../agentoven-pro && eval "$(go run ./_tools/gen_license)"
 ```
 
 `samples/` has a client quick start and four agent processes: echo, Microsoft.Extensions.AI, Agent Framework and

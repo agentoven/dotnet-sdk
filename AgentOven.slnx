@@ -15,6 +15,7 @@
     <Project Path="src/AgentOven/AgentOven.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/AgentOven.IntegrationTests/AgentOven.IntegrationTests.csproj" />
     <Project Path="tests/AgentOven.Runtime.Tests/AgentOven.Runtime.Tests.csproj" />
     <Project Path="tests/AgentOven.Tests/AgentOven.Tests.csproj" />
   </Folder>

@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    End-to-end tests against real control planes. They skip unless AGENTOVEN_E2E_URL (OSS) / AGENTOVEN_E2E_PRO_URL (Pro)
+    are set; scripts/e2e.sh starts everything and runs them.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AgentOven\AgentOven.csproj" />
+  </ItemGroup>
+</Project>

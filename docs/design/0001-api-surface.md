@@ -400,7 +400,7 @@ and every type name above stays the same — only the `using` line changes.
 | Fluency | Builders + resource clients + handles, as proposed; no flat shortcuts |
 | Targets | Latest .NET plus the two before it: `net10.0;net9.0;net8.0`. No `netstandard2.0` |
 | Adapters | All three, as separate packages so users pull only what they use: `AgentOven.Runtime.AI` (Microsoft.Extensions.AI), `AgentOven.Runtime.AgentFramework`, `AgentOven.Runtime.SemanticKernel` |
-| v1 scope | Agents, recipes, providers, sessions, kitchens, runtime. Other Pro APIs in v1.1 |
+| v1 scope | Agents, recipes, providers, sessions, kitchens, runtime. Later extended to the rest of the OSS catalog and the Pro API (section 9) |
 
 **Changes made to match the server** (`control-plane/` in agentoven/agentoven is the source of truth, not the
 Python or Rust clients):
@@ -429,22 +429,78 @@ Python or Rust clients):
 - `AGENT_MODEL_PROVIDER` carries the provider's *name*, not its kind. `AgentOvenRuntime.ModelKind` reads
   `AGENT_MODEL_KIND` or infers the kind from the name.
 
-**Verified end to end.** The Go control plane (v0.5.1) was built from source. It baked .NET agents that run their
-own processes, from `samples/EchoAgent` and `samples/ChatAgent`. Verified: register, bake (process spawned,
-`AGENT_READY` seen), invoke through the control plane, two-step recipe runs, sessions, log streaming, and
-cool/rewarm. For ChatAgent, the system prompt was rendered with invoke variables, and token usage came back
-through the control plane.
+**Verified end to end.** `scripts/e2e.sh` runs `tests/AgentOven.IntegrationTests` against control planes built
+from source: OSS v0.9.0 (12 tests) and Pro (9 tests, PostgreSQL with pgvector). The model and MCP server are a fake
+OpenAI-compatible upstream (`tests/e2e/fake_upstream.py`), so the run needs no keys and is deterministic. Covered:
 
-**Server issues found** (in agentoven/agentoven, not fixed here):
+- .NET agent processes: register, bake (process spawned, `AGENT_READY` seen), invoke and stream through the
+  control plane, sessions, log streaming, cool/rewarm, and the caller token.
+- ChatAgent with the injected model, rendered prompt variables, and MCP tool calls in both invoke and stream.
+- Managed agents with sessions and image attachments.
+- Recipes paused on a human gate and approved.
+- Providers with modalities and the model catalog, tools with credential refs, prompt versions and validation,
+  kitchens and settings, scoped keys with quotas, skills (accepted, needs review, rejected, approval, chunked
+  bundle upload), resume and unfinished runs, and audit.
+- Pro: license, login and identity, users and kitchen members, workspace guardrails and exemptions, environments
+  with agent bakes, promotion dry runs, deployments and the traceability matrix, service-account tokens,
+  schedules, credentials, test suites run against a baked agent, world schemas, scenarios and judges, realtime
+  tokens, workloads, and agent import.
 
-1. `POST /agents/{name}/invoke/stream` returns 404 for every agent. `StreamInvokeAgent` calls
-   `Store.GetAgent(ctx, agentName, kitchen)`, but the signature is `(ctx, kitchen, name)`.
-   `InvokeStreamingAsync` follows the documented contract and will work once that is fixed.
-2. The process manager injects the provider name as `AGENT_MODEL_PROVIDER`, and no kind. The built-in runner
+**Server issues found** (in agentoven/agentoven and agentoven-pro, not fixed here). The streaming 404 reported
+against v0.5.1 is fixed in v0.9.0.
+
+*OSS*
+
+1. The process manager injects the provider name as `AGENT_MODEL_PROVIDER`, and no kind. The built-in runner
    compares it against kinds, so a provider named anything other than its kind falls back to OpenAI.
-   Suggested fix: also inject `AGENT_MODEL_KIND`.
-3. A framework-native agent still needs a model ingredient to bake, and the provider must answer a health check.
-4. The built-in runner's delegation sends `X-Kitchen-Id`, which the server never reads (it reads `X-Kitchen`).
+   Suggested fix: also inject `AGENT_MODEL_KIND`. The .NET runtime infers the kind from the name meanwhile.
+2. A framework-native agent still needs a model ingredient to bake, and the provider must answer a health check.
+3. The built-in runner's delegation sends `X-Kitchen-Id`, which the server never reads (it reads `X-Kitchen`).
    Delegated calls therefore land in the `default` kitchen.
-5. The Python SDK's runtime reads `AGENTOVEN_PORT` (default 8000) and `AGENT_SYSTEM_PROMPT`. Neither is what the
+4. The Python SDK's runtime reads `AGENTOVEN_PORT` (default 8000) and `AGENT_SYSTEM_PROMPT`. Neither is what the
    local executor sets. It also does not serve `/health`.
+5. Every managed agent gets a runner process (the process manager is always on, ports from 9100). So
+   `approval_tools`, `output_schema` and `subagents`, which only the in-process executor applies, have no effect
+   on a standard deployment, and the in-process stream format (PascalCase `Type`/`Turn`/`Content`) is rarely seen.
+   The client parses both stream formats.
+6. A synchronous invoke that pauses for approval answers 502 with no trace id. Use the stream, or
+   `ListUnfinishedRunsAsync`, to find the run.
+7. Resuming an unknown run answers 502 (`journal: no run found`) instead of 404.
+8. Calls a scoped key is denied still count against its `max_calls` quota.
+9. `POST`/`PUT /prompts` wrap the prompt as `{prompt, validation}`, unlike `GET`. The client unwraps it.
+10. Several list routes return JSON `null` for an empty list. The client returns an empty list.
+11. Clearing a provider modality restores the driver default rather than turning it off. Use `Pdf(false)` to turn
+    one off.
+
+*Pro*
+
+12. Agents are stored by kitchen *name* and agent environments by kitchen *UUID*, and both read `X-Kitchen`. With a
+    kitchen name, `PUT /agents/{n}/environments/{slug}` fails (`invalid input syntax for type uuid`). With a UUID,
+    agent create fails. The client resolves the kitchen's UUID for the agent-environment routes only.
+13. Seeding the `default` kitchen fails, so it has no UUID and agent environments cannot be used in it.
+14. Rotating a service-account token revokes the account, then re-inserts it under the same primary key and
+    fails (`duplicate key`). The account is left revoked with no new token.
+15. `PostgresStore.GetAgentVersion` keeps no history: only the agent's current version can be promoted. An agent
+    registered without a version can only be promoted from an active deployment.
+16. `GET /kitchens/{id}` and `GET /users/{id}` always answer 404. `GET /guardrails/{id}` does not exist (the
+    client's `FindAsync` lists and filters). Scoped keys answer 500 for not found.
+
+## 9. Pro: following the server, not the other clients
+
+The Pro clients follow `agentoven-pro` handlers. Where the Python or TypeScript clients disagree with them, the
+.NET client does what the server does:
+
+| Area | Server behaviour the .NET client follows |
+|---|---|
+| Auth | `POST /auth/login` with `{username, password}`; identity from `GET /auth/me` |
+| Guardrails | Toggle is `PATCH /guardrails/{id}/toggle` with no body. Exemptions are removed by exemption id |
+| Environments | Addressed by `slug`. Promotion answers 202 when it waits on approval. The matrix takes `?kitchen=` |
+| Agent environments | `PUT /agents/{name}/environments/{slug}` is create-or-update. Kitchen UUID, see issue 12 |
+| Service accounts | Create returns `{service_account, token, warning}`; the token is shown once |
+| Schedules | The field is `cron_expr` |
+| Test suites | Run returns `{run_id}`; poll `GET .../runs/{run_id}` (`WaitForRunAsync`) |
+| Scenarios | `match.why` is a list of reasons |
+| Judges | Must pin a `provider`, or create answers 422 |
+| Credentials | Rotation is `PUT /credentials/{name}` |
+| Agent import | `POST /agents/import` with a `text/markdown` body |
+| Realtime | `POST /realtime/{agent}/token` (1–300 s), then a WebSocket with subprotocol `agentoven.v1`, waiting for `ready` |
